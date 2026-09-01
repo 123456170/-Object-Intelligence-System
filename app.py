@@ -18,6 +18,7 @@ import random
 import time
 from collections import deque
 from dataclasses import dataclass, field
+from pathlib import Path
 
 import cv2
 import numpy as np
@@ -27,19 +28,47 @@ import plotly.graph_objects as go
 import streamlit as st
 
 # ════════════════════════════════════════════════════════════════
-# 0. PAGE CONFIG
+# 0. THEME — auto-install dark theme config on first run
 # ════════════════════════════════════════════════════════════════
+THEME_TOML = """[theme]
+base = "dark"
+primaryColor = "#4FC3F7"
+backgroundColor = "#0E1117"
+secondaryBackgroundColor = "#161B22"
+textColor = "#E6E9EE"
+"""
+
+
+def ensure_dark_theme() -> bool:
+    """Write .streamlit/config.toml (dark theme) if it doesn't exist."""
+    cfg = Path.cwd() / ".streamlit" / "config.toml"
+    if cfg.exists():
+        return False
+    try:
+        cfg.parent.mkdir(parents=True, exist_ok=True)
+        cfg.write_text(THEME_TOML, encoding="utf-8")
+        return True
+    except Exception:
+        return False
+
+
+THEME_INSTALLED = ensure_dark_theme()
+
 st.set_page_config(page_title="Object Intelligence System", page_icon="🛰️", layout="wide")
 st.markdown(
     """
     <style>
     .block-container{padding-top:1.1rem;}
-    div[data-testid="stToolbar"]{display:none;}
     footer{visibility:hidden;}
     </style>
     """,
     unsafe_allow_html=True,
 )
+
+# Adaptive chart theme (matches whatever Streamlit theme is active)
+IS_DARK = st.get_option("theme.base") == "dark"
+PL_TEMPLATE = "plotly_dark" if IS_DARK else "plotly_white"
+PL_TEXT = "#e6e9ee" if IS_DARK else "#1a1a2e"
 
 # ════════════════════════════════════════════════════════════════
 # 1. CONSTANTS & HELPERS
@@ -1108,6 +1137,11 @@ st.markdown(
 )
 st.caption("Detection → Classification → Tracking → Behavior Analysis · unified intelligence per object · synthetic feed")
 
+if THEME_INSTALLED:
+    st.info("🎨 Dark theme config was auto-installed (.streamlit/config.toml). "
+            "Restart Streamlit once (Ctrl+C → `streamlit run app.py`) to apply it. "
+            "You can also switch theme anytime via the ⋮ menu (top-right) → Settings → Theme.")
+
 
 # ---------------- live panel (≈8 Hz) ----------------
 @_fragment(0.12)
@@ -1193,7 +1227,7 @@ def analytics_panel():
         cnt.columns = ["class", "n"]
         fig1 = px.pie(cnt, values="n", names="class", hole=0.55, color="class",
                       color_discrete_map={m["label"]: rgb2hex(m["rgb"]) for m in CLASS_META.values()})
-        fig1.update_layout(template="plotly_dark", height=240, margin=dict(l=8, r=8, t=24, b=8),
+        fig1.update_layout(template=PL_TEMPLATE, height=240, margin=dict(l=8, r=8, t=24, b=8),
                            title="Classes", legend=dict(orientation="h", y=-0.15))
         c1.plotly_chart(fig1, use_container_width=True, config=cfg)
 
@@ -1202,19 +1236,19 @@ def analytics_panel():
         bcnt.columns = ["behavior", "n"]
         fig2 = px.bar(bcnt, x="n", y="behavior", orientation="h", color="behavior",
                       color_discrete_map=BEHAVIOR_COLOR)
-        fig2.update_layout(template="plotly_dark", height=240, margin=dict(l=8, r=8, t=24, b=8),
+        fig2.update_layout(template=PL_TEMPLATE, height=240, margin=dict(l=8, r=8, t=24, b=8),
                            title="Behavior mix", showlegend=False)
         c2.plotly_chart(fig2, use_container_width=True, config=cfg)
 
         dfs = pd.DataFrame(list(eng.speed_trend), columns=["t", "v"])
         dfs["t"] = dfs["t"] - eng.t
         fig3 = px.line(dfs, x="t", y="v")
-        fig3.update_layout(template="plotly_dark", height=240, margin=dict(l=8, r=8, t=24, b=8),
+        fig3.update_layout(template=PL_TEMPLATE, height=240, margin=dict(l=8, r=8, t=24, b=8),
                            title="Avg speed of moving objects")
         c3.plotly_chart(fig3, use_container_width=True, config=cfg)
 
         fig4 = px.histogram(x=[tr.conf for tr in tracks], nbins=12)
-        fig4.update_layout(template="plotly_dark", height=240, margin=dict(l=8, r=8, t=24, b=8),
+        fig4.update_layout(template=PL_TEMPLATE, height=240, margin=dict(l=8, r=8, t=24, b=8),
                            title="Confidence distribution")
         fig4.update_xaxes(title="confidence")
         c4.plotly_chart(fig4, use_container_width=True, config=cfg)
@@ -1247,7 +1281,7 @@ def analytics_panel():
                 customdata=[r["id"]], width=0.6,
                 hovertemplate=f"<b>%{{y}}</b> · {r['state']}<br>%{{x:.1f}} s<extra></extra>"))
         n_lab = len({r["label"] for r in rows})
-        fig.update_layout(barmode="overlay", template="plotly_dark",
+        fig.update_layout(barmode="overlay", template=PL_TEMPLATE,
                           height=min(430, 90 + 26 * n_lab),
                           margin=dict(l=8, r=8, t=8, b=8), showlegend=False)
         fig.update_xaxes(range=[win, eng.t], title="sim time (s)")
@@ -1293,7 +1327,7 @@ def analytics_panel():
                 figv = go.Figure(go.Scatter(x=[h[0] - eng.t for h in hist[-n:]], y=sp[-n:],
                                             mode="lines", line=dict(color="#4fc3f7", width=2),
                                             fill="tozeroy", fillcolor="rgba(79,195,247,0.12)"))
-                figv.update_layout(template="plotly_dark", height=200,
+                figv.update_layout(template=PL_TEMPLATE, height=200,
                                    margin=dict(l=8, r=8, t=20, b=8), title="Speed (m/s)")
                 st.plotly_chart(figv, use_container_width=True, config=cfg)
         with fr:
